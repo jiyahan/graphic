@@ -606,7 +606,7 @@ class LineAreaPointPage extends StatelessWidget {
                     horizontalRange: [0.05, 0.95],
                     verticalRange: [0.05, 0.95],
                   ),
-                  selections: {'choose': IntervalSelection()},
+                  selections: {'choose': PolygonSelection()},
                   tooltip: TooltipGuide(
                     anchor: (_) => Offset.zero,
                     align: Alignment.bottomRight,

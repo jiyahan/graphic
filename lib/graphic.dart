@@ -223,6 +223,7 @@ export 'src/interaction/selection/selection.dart'
     show Selection, Selected, SelectionUpdater;
 export 'src/interaction/selection/interval.dart' show IntervalSelection;
 export 'src/interaction/selection/point.dart' show PointSelection;
+export 'src/interaction/selection/polygon.dart' show PolygonSelection;
 
 export 'src/common/label.dart' show Label;
 export 'src/common/defaults.dart' show Defaults;

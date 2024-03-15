@@ -17,6 +17,7 @@ import 'package:graphic/src/util/collection.dart';
 
 import 'interval.dart';
 import 'point.dart';
+import 'polygon.dart';
 
 /// The specification of a selection.
 ///
@@ -178,8 +179,7 @@ class SelectorOp extends Operator<Map<String, Selector>?> {
           spec.variable,
           [gesture.localPosition],
         );
-      } else {
-        spec as IntervalSelection;
+      } else if (spec is IntervalSelection) {
         List<Offset> points;
 
         if (value != null && value!.keys.contains(name)) {
@@ -249,6 +249,83 @@ class SelectorOp extends Operator<Map<String, Selector>?> {
           spec.variable,
           points,
         );
+      } else {
+        spec as PolygonSelection;
+        List<Offset> points = [];
+
+        if (value != null && value!.keys.contains(name)) {
+          // If an interval selector of the same name is in previous value.
+
+          final prePoints = value![name]!.points;
+
+          points.addAll(prePoints);
+
+          if (gesture.type == GestureType.scaleUpdate) {
+            final detail = gesture.details as ScaleUpdateDetails;
+
+            if (detail.pointerCount == 1) {
+              if (gesture.localMoveStart == prePoints.first) {
+                // Still in the creating panning.
+
+                points.add(gesture.localPosition);
+              } else {
+                // Pans to move.
+
+                final delta = detail.focalPointDelta;
+                points.add(prePoints.last + delta);
+              }
+            } else {
+              // Scales to zoom.
+
+              final preScale = gesture.preScaleDetail!.scale;
+              final scale = detail.scale;
+              final deltaRatio = (scale - preScale) / preScale / 2;
+              final preOffset = prePoints.last - prePoints.first;
+              final delta = preOffset * deltaRatio;
+              //points = [prePoints.first - delta, prePoints.last + delta];
+              points.add(prePoints.last + delta);
+            }
+          } else if (gesture.type == GestureType.scaleStart) {
+            final detail = gesture.details as ScaleStartDetails;
+            points = [detail.localFocalPoint];
+          } else {
+            // scrolls to zoom.
+
+            const step = 0.1;
+            final scrollDelta = gesture.details as Offset;
+            final deltaRatio = scrollDelta.dy == 0
+                ? 0.0
+                : scrollDelta.dy > 0
+                    ? (step / 2)
+                    : (-step / 2);
+            final preOffset = prePoints.last - prePoints.first;
+            final delta = preOffset * deltaRatio;
+            points.add(prePoints.last + delta);
+          }
+        } else {
+          // If the current interval selector is totally new.
+
+          if (gesture.type == GestureType.scaleUpdate) {
+            final detail = gesture.details as ScaleUpdateDetails;
+
+            if (detail.pointerCount == 1) {
+              // Only creates by panning.
+
+              points = [gesture.localPosition];
+            } else {
+              return null;
+            }
+          } else {
+            return null;
+          }
+        }
+
+        rst[name] = PolygonSelector(
+          spec.color ?? const Color(0x10101010),
+          spec.dim,
+          spec.variable,
+          points,
+        );
       }
     }
     return rst.isEmpty ? null : rst;
@@ -277,6 +354,11 @@ class SelectorRenderOp extends Render {
       scene.set(renderIntervalSelector(
         selector.points.first,
         selector.points.last,
+        selector.color,
+      ));
+    } else if (selector is PolygonSelector) {
+      scene.set(renderPolygonSelector(
+        selector.points,
         selector.color,
       ));
     } else {

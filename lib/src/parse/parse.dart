@@ -308,7 +308,11 @@ void parse<D>(
       final on = selectSpec.on ??
           (selectSpec is PointSelection
               ? {GestureType.tap}
-              : {GestureType.scaleUpdate, GestureType.scroll});
+              : {
+                  GestureType.scaleUpdate,
+                  GestureType.scroll,
+                  GestureType.scaleStart
+                });
       final clear = selectSpec.clear ?? {GestureType.doubleTap};
       for (var type in on) {
         if (onTypes[type] == null) {
