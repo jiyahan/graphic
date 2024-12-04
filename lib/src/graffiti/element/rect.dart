@@ -34,6 +34,7 @@ class RectElement extends PrimitiveElement {
 
   @override
   void drawPath(Path path) {
+    if (rect.hasNaN) return;
     if (borderRadius == null || borderRadius == BorderRadius.zero) {
       path.addRect(rect);
     } else {

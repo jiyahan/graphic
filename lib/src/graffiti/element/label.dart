@@ -179,12 +179,11 @@ class LabelElement extends BlockElement<LabelStyle> {
           tag: tag,
         ) {
     _painter = TextPainter(
-      text: this.style.textStyle != null
+      textScaler: TextScaler.linear(this.style.textScaleFactor ?? 1.0), text: this.style.textStyle != null
           ? TextSpan(text: text, style: this.style.textStyle)
           : this.style.span!(text),
       textAlign: this.style.textAlign ?? TextAlign.start,
       textDirection: this.style.textDirection ?? TextDirection.ltr,
-      textScaleFactor: this.style.textScaleFactor ?? 1.0,
       maxLines: this.style.maxLines,
       ellipsis: this.style.ellipsis,
       locale: this.style.locale,

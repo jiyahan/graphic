@@ -97,6 +97,8 @@ class HeatmapShape extends PolygonShape {
     final biasX = stepXRst / 2;
     final biasY = stepYRst / 2;
 
+    final minBias = min(biasX, biasY);
+
     final rst = <MarkElement>[];
 
     for (var item in group) {

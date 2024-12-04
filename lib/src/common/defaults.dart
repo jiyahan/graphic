@@ -7,7 +7,7 @@ import 'package:graphic/src/interaction/event.dart';
 import 'package:graphic/src/interaction/gesture.dart';
 
 /// Gets event update for different dimensions.
-EventUpdater<List<double>> _getRangeUpdate(
+EventUpdater<List<double>> _getRangeUpdate_old(
         bool isHorizontal, bool focusMouseScale) =>
     (
       List<double> init,
@@ -77,6 +77,144 @@ EventUpdater<List<double>> _getRangeUpdate(
       }
 
       return pre;
+    };
+
+EventUpdater<List<double>> _getRangeUpdate(
+  bool isHorizontal,
+  bool focusMouseScale,
+) =>
+    (
+      List<double> initialValue,
+      List<double> previousBoundaries,
+      Event event,
+    ) {
+      if (event is GestureEvent) {
+        final Gesture gesture = event.gesture;
+
+        if (gesture.type == GestureType.scaleUpdate) {
+          final ScaleUpdateDetails details =
+              gesture.details as ScaleUpdateDetails;
+
+          if (details.pointerCount == 1) {
+            /// Panning.
+
+            final deltaRatio = isHorizontal
+                ? gesture.preScaleDetail!.focalPointDelta.dx
+                : -gesture.preScaleDetail!.focalPointDelta.dy;
+            final delta = deltaRatio /
+                (isHorizontal
+                    ? gesture.chartSize.width
+                    : gesture.chartSize.height);
+            return [
+              previousBoundaries.first + delta,
+              previousBoundaries.last + delta
+            ];
+          } else {
+            /// Scaling.
+
+            /// Compute scaling strength [delta]
+            final double previousScale = gesture.preScaleDetail!.scale;
+            final double scale = details.scale;
+            late final double deltaRatio;
+            if (previousScale == 0) {
+              deltaRatio = 0;
+            } else {
+              deltaRatio = scale - previousScale;
+            }
+            final double previousRange =
+                previousBoundaries.last - previousBoundaries.first;
+            final double delta = deltaRatio * previousRange;
+
+            /// Compute new graph boundaries.
+
+            /// Special case of the graph bounds perfectly matching the viewport.
+            if (previousBoundaries.first.abs() +
+                    previousBoundaries.last.abs() -
+                    1 ==
+                0) {
+              return [
+                previousBoundaries.first - delta,
+                previousBoundaries.last + delta
+              ];
+            }
+
+            /// To prevent the graph from moving out of the viewport when zoomed we define a focus point in the
+            /// viewport (e.g. 0.5 for the center of the viewport) and we weigh the movement of the returned first and last
+            /// boundary of the graph by a value proportional to the distance of the boundary to the focus point.
+            const double focusPoint = 0.5;
+            double computeBoundaryRatio(bool isFirstBound) {
+              final double boundaryValue = isFirstBound
+                  ? previousBoundaries.first
+                  : previousBoundaries.last;
+              return (boundaryValue - focusPoint).abs() /
+                  (previousBoundaries.first.abs() +
+                      previousBoundaries.last.abs() -
+                      focusPoint * 2);
+            }
+
+            double normalizeBoundaryRatio(bool isFirstBound,
+                double newBoundaryStart, double newBoundaryEnd) {
+              final double newBoundaryValue =
+                  isFirstBound ? newBoundaryStart : newBoundaryEnd;
+              return newBoundaryValue / (newBoundaryStart + newBoundaryEnd);
+            }
+
+            final double unnormalizedFirstBoundaryRatio =
+                computeBoundaryRatio(true);
+            final double unnormalizedLastBoundaryRatio =
+                computeBoundaryRatio(false);
+
+            /// We normalize the final ratio to make sure the sum of the 2 ratios is always 1 (which keeps the zoom strength constant).
+            final double firstBoundaryRatio = normalizeBoundaryRatio(true,
+                unnormalizedFirstBoundaryRatio, unnormalizedLastBoundaryRatio);
+            final double lastBoundaryRatio = normalizeBoundaryRatio(false,
+                unnormalizedFirstBoundaryRatio, unnormalizedLastBoundaryRatio);
+
+            final double newFirstBoundary =
+                previousBoundaries.first - firstBoundaryRatio * delta;
+            final double newLastBoundary =
+                previousBoundaries.last + lastBoundaryRatio * delta;
+
+            return [newFirstBoundary, newLastBoundary];
+          }
+        } else if (gesture.type == GestureType.scroll) {
+          const step = -0.1;
+          final scrollDelta = gesture.details as Offset;
+          final deltaRatio = scrollDelta.dy == 0
+              ? 0.0
+              : scrollDelta.dy > 0
+                  ? (step / 2)
+                  : (-step / 2);
+          final preRange = previousBoundaries.last - previousBoundaries.first;
+          final delta = deltaRatio * preRange;
+          if (!focusMouseScale) {
+            return [
+              previousBoundaries.first - delta,
+              previousBoundaries.last + delta
+            ];
+          } else {
+            double mousePos;
+            if (isHorizontal) {
+              mousePos = (gesture.localPosition.dx - 39.5) /
+                  (gesture.chartSize.width - 51);
+            } else {
+              mousePos = 1 -
+                  (gesture.localPosition.dy - 5) /
+                      (gesture.chartSize.height - 25);
+            }
+            mousePos = (mousePos - previousBoundaries.first) /
+                (previousBoundaries.last - previousBoundaries.first);
+            return [
+              previousBoundaries.first - delta * 2 * mousePos,
+              previousBoundaries.last + delta * 2 * (1 - mousePos)
+            ];
+          }
+        } else if (gesture.type == GestureType.doubleTap) {
+          return initialValue;
+        }
+      }
+
+      return previousBoundaries;
     };
 
 /// Some useful default values for specifications.
@@ -155,13 +293,31 @@ abstract class Defaults {
         ),
       );
 
+  static AxisGuide get horizontalTopAxis => AxisGuide(
+        line: strokeStyle,
+        label: LabelStyle(
+          textStyle: textStyle,
+          offset: const Offset(0, 7.5),
+        ),
+        position: 1,
+      );
+
   /// A specification for vertical axis.
   static AxisGuide get verticalAxis => AxisGuide(
         label: LabelStyle(
           textStyle: textStyle,
           offset: const Offset(-7.5, 0),
         ),
-        grid: strokeStyle,
+        line: strokeStyle,
+      );
+
+  static AxisGuide get verticalRightAxis => AxisGuide(
+        label: LabelStyle(
+          textStyle: textStyle,
+          offset: const Offset(-7.5, 0),
+        ),
+        line: strokeStyle,
+        position: 1,
       );
 
   /// A specification for radial axis.
